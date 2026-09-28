@@ -190,4 +190,19 @@ app.put('/api/products/:id/status', requireAdmin, (req, res) => {
 
 app.get('*', (_req, res) => res.sendFile(path.join(PUBLIC, 'index.html')));
 
+
+// Return readable JSON errors for upload/validation failures.
+app.use((err, _req, res, _next) => {
+  if (err && err.name === 'MulterError') {
+    const msg = err.code === 'LIMIT_FILE_SIZE' ? 'Mỗi ảnh tối đa 10 MB.' :
+      err.code === 'LIMIT_FILE_COUNT' ? 'Tối đa 12 ảnh cho một sản phẩm.' : err.message;
+    return res.status(400).json({ ok: false, error: msg });
+  }
+  if (err) {
+    console.error(err);
+    return res.status(500).json({ ok: false, error: 'Lỗi máy chủ khi lưu dữ liệu.' });
+  }
+  res.status(500).json({ ok: false, error: 'Lỗi máy chủ.' });
+});
+
 app.listen(PORT, () => console.log(`DLS Store running on http://localhost:${PORT}`));
