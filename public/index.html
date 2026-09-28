@@ -3370,24 +3370,55 @@ document
   };
 
   window.saveProduct = async function(){
-    if(!admin) return alert('Chỉ Admin mới được lưu tài khoản.');
-    const name=$('productName').value.trim(), price=$('productPrice').value.trim(), description=$('productDescription').value.trim(), status=$('productStatus').value;
+    if(!admin) return alert('Phiên Admin đã hết. Vui lòng đăng nhập lại.');
+    const btn = document.querySelector('#adminForm .save');
+    const nameEl=$('productName'), priceEl=$('productPrice'), descEl=$('productDescription'), statusEl=$('productStatus');
+    const name=(nameEl?.value || '').trim();
+    const price=(priceEl?.value || '').trim();
+    const description=(descEl?.value || '').trim();
+    const status=statusEl?.value || 'available';
     if(!name) return alert('Hãy nhập tên tài khoản.');
     if(!price) return alert('Hãy nhập giá.');
-    const uploadFiles=[]; if(mainFile) uploadFiles.push(mainFile); detailFiles.forEach(f=>{ if(!mainFile || f.name!==mainFile.name || f.size!==mainFile.size) uploadFiles.push(f); });
+    const uploadFiles=[];
+    if(mainFile) uploadFiles.push(mainFile);
+    detailFiles.forEach(f=>{
+      if(!mainFile || f.name!==mainFile.name || f.size!==mainFile.size || f.lastModified!==mainFile.lastModified) uploadFiles.push(f);
+    });
     if(!uploadFiles.length && !existingImages.length) return alert('Hãy chọn ít nhất một ảnh.');
     const fd=new FormData();
-    if(editingId) fd.append('id', editingId);
-    fd.append('name',name); fd.append('price',price); fd.append('description',description); fd.append('status',status); fd.append('mainIndex','0');
-    productFiles.forEach(f=>fd.append('images',f));
-    if(!productFiles.length) fd.append('existingImages',JSON.stringify(existingImages));
+    if(editingId) fd.append('id', String(editingId));
+    fd.append('name',name);
+    fd.append('price',price);
+    fd.append('description',description);
+    fd.append('status',status);
+    fd.append('mainIndex','0');
+    uploadFiles.forEach(f=>fd.append('images',f, f.name));
+    if(!uploadFiles.length) fd.append('existingImages',JSON.stringify(existingImages));
+    const oldText = btn ? btn.innerHTML : '';
     try{
-      await api('/api/products',{method:'POST',body:fd});
-      await refreshStore();
-      $('adminForm').classList.add('hidden');
+      if(btn){ btn.disabled=true; btn.innerHTML='⏳ Đang lưu...'; }
+      const result = await api('/api/products',{method:'POST',body:fd});
+      if(result.product){
+        const idx=products.findIndex(p=>p.id===result.product.id);
+        if(idx>=0) products[idx]=result.product; else products.push(result.product);
+      }
+      if(typeof window.renderProducts==='function') window.renderProducts();
+      if(typeof window.renderAdmin==='function' && admin) window.renderAdmin();
+      if($('adminForm')) $('adminForm').classList.add('hidden');
+      editingId=null; mainFile=null; detailFiles=[]; existingImages=[]; selectedMainImage=''; selectedImages=[];
+      if($('productImage')) $('productImage').value='';
+      if($('productImages')) $('productImages').value='';
+      if($('mainPreview')) $('mainPreview').innerHTML='';
+      if($('multiplePreview')) $('multiplePreview').innerHTML='';
       alert('Đã lưu tài khoản thành công. Khách truy cập trang sẽ thấy ngay.');
-      editingId=null; mainFile=null; detailFiles=[]; existingImages=[];
-    }catch(e){ alert(e.message); }
+      // Đồng bộ lại một lần nữa với máy chủ; nếu lỗi mạng tạm thời thì sản phẩm vừa lưu vẫn đã được server nhận.
+      refreshStore().catch(err=>console.warn('Đồng bộ sau khi lưu thất bại:',err));
+    }catch(e){
+      console.error('SAVE PRODUCT ERROR',e);
+      alert('Không lưu được: ' + e.message);
+    }finally{
+      if(btn){ btn.disabled=false; btn.innerHTML=oldText; }
+    }
   };
 
   window.deleteProduct = async function(id){
