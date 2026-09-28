@@ -1,0 +1,9 @@
+node_modules/
+.env
+.DS_Store
+*.log
+npm-debug.log*
+uploads/*
+!uploads/.gitkeep
+# Local runtime data (keep the template, not live customer data)
+data/store.json
